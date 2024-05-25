@@ -1,5 +1,5 @@
-Number of iterations: 11273
-Beginning of simulation: Sat May 25 09:55:10 2024
-log written on: Sat May 25 11:42:15 2024
-Time of simulation (seconds): 6425.2365090847015
-Simulation convergence: True
+Number of iterations: 1000
+Beginning of simulation: Sat May 25 18:25:59 2024
+log written on: Sat May 25 18:34:55 2024
+Time of simulation (seconds): 535.8783349990845
+Simulation convergence: False

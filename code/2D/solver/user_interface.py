@@ -8,13 +8,14 @@ import numpy as np
 
 
 class user_interface(object):
-    plot_parameters = {'axes.labelsize': 20,
-                  'axes.titlesize': 20,
-                  'legend.fontsize': 20,
-                  'xtick.labelsize': 15,
-                  'ytick.labelsize': 15}
+    plot_parameters = { 'axes.labelsize': 20,
+                        'axes.titlesize': 20,
+                        'legend.fontsize': 20,
+                        'xtick.labelsize': 15,
+                        'ytick.labelsize': 15}
     colormap = 'jet'
     plotting_levels = 1000
+    fps = 100
 
     def __init__(self,path,grid_name):
         self.grid = grid.computational_grid(path, grid_name)
@@ -33,7 +34,12 @@ class user_interface(object):
         self.tini = time.time()
         self.dt = dt
 
-    def run_computation(self,tol,residuals_printing_interval,saving_interval,save_path,case_name):
+    def run_computation(self,tol,residuals_printing_interval,saving_interval,save_path,case_name,save_video=False):
+        x_V, y_V = self.grid.get_centroids()
+        img_saved = 0
+        if save_video:
+            if not os.path.exists(os.path.join(save_path, case_name)):
+                os.mkdir(os.path.join(save_path, case_name))
         self.solver.one_step_AUSM(self.dt)
         self.T.append(self.T[-1] + self.dt)
         self.nb_iter += 1
@@ -42,7 +48,7 @@ class user_interface(object):
         self.Xr.append(xr)
         self.Yr.append(yr)
         self.Er.append(er)
-        print(cr)
+        print('residuals:\tcontinuity|' + str(cr)+'\tX-momentum|'+str(xr)+'\tY-momentum|'+str(yr)+'\tenergy|'+str(er))
 
         # solving loop #
         while cr > tol: # machine precision : 1e-16
@@ -68,6 +74,19 @@ class user_interface(object):
                 self.save_states(save_path,case_name)
                 self.save_residuals_and_physical_time(save_path, case_name)
                 self.save_computation_log(save_path, case_name)
+
+            if save_video:
+                #!!! certainly problematic if dt is too high and fps too low (or it will juste save every frame, idk)
+                if self.T[-1] * user_interface.fps >= img_saved:
+                    plt.contourf(x_V, y_V, self.grid.get_cells_physical_value('rho'), levels=user_interface.plotting_levels,cmap=user_interface.colormap)
+                    plt.colorbar()
+                    plt.xlabel('x')
+                    plt.ylabel('y')
+                    plt.title(r'$\rho$')
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(save_path,case_name,str(img_saved))+'.png')
+                    plt.clf()
+                    img_saved += 1
 
         print('Seconds simulated :', self.T[-1], 'seconds')
         self.converged = True
@@ -221,7 +240,8 @@ if __name__ == '__main__':
     # new calculation
     ui = user_interface(path,grid_name)
     ui.initialize_computation(dt)
-    ui.run_computation(tol,1000,1000,save_path,case_name)
+    user_interface.fps = 10000
+    ui.run_computation(tol,1000,1000,save_path,case_name,save_video=False)
     ui.plot_residuals()
     print(ui.grid)
     ui.save_computation_log(save_path,case_name)
