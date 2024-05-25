@@ -1,0 +1,445 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import initialisation
+import cellproperties
+import readgrid
+
+######################### change boundary conditions with the new functions made(T and P)
+######################### for very low Mini, it seems like there is a mistake for the upper wall
+
+######################################################################
+####################  data definition  ###############################
+######################################################################
+
+# constant thermodynamic data of air
+R = 8.31446261815324
+MW = 28.96e-3
+r = R/MW
+gamma = 1.400  # can use NIST data to compute
+Cp = 1005  # J/kg/K , can use NIST data to compute
+
+# initial conditions
+Tini = 300.0
+Pini = 101325.0
+Mini = 2.0
+rhoini = Pini/r/Tini
+
+######################################################################
+###############  extraction function definition  #####################
+######################################################################
+
+def c(g,T):
+    return(np.sqrt(g*r*T))
+
+def extract_u(Q):
+    return(Q[:,:,1]/Q[:,:,0])
+
+def extract_v(Q):
+    return(Q[:,:,2]/Q[:,:,0])
+
+def extract_et(Q):
+    return (Q[:, :, 3] / Q[:, :, 0])
+
+def extract_P(Q):
+    et = extract_et(Q)
+    u = extract_u(Q)
+    v = extract_v(Q)
+    return((gamma-1)*Q[:,:,0]*(et-0.5*(u**2+v**2)))
+
+def extract_ht(Q):
+    et = extract_et(Q)
+    P = extract_P(Q)
+    return(et+P/Q[:, :, 0])
+
+def extract_T(Q):
+    return(((gamma - 1) * (Q[:, :, 3] - 1 / 2 * (Q[:, :, 1] ** 2 + Q[:, :, 2] ** 2) / Q[:, :, 0])) / r / Q[:, :, 0])
+
+
+######################################################################
+########################  flux limiters  #############################
+######################################################################
+
+def van_albada_1_flux_limiter(r):
+    return((r**2+r)/(r**2+1))
+
+def van_albada_2_flux_limiter(r):
+    return(2*r/(r**2+1))
+
+def lax_wendroff(r):
+    return 1
+
+def beam_warming(r):
+    return r
+
+######################################################################
+#################  left ad right state averaging  ####################
+######################################################################
+
+def f(left,right):
+    return((left+right)/2)
+
+######################################################################
+########################### MUSCL scheme #############################
+######################################################################
+
+
+def MUSCL(X,eps=0,k=-1):
+    """
+    return the interpolation of cells state on cell faces in the computational domaine (boundary included)
+    :param X:
+    :param eps:
+    :param k:
+    :return:
+    """
+    # for the moment, only first order is working
+    # reading of the neighbor cells #
+
+    Q_l_x_plus_half = X[1:-1,:-1,:]
+    Q_r_x_plus_half = X[1:-1,1:,:]
+    #Q_x_half = f(Q_l_x_plus_half,Q_r_x_plus_half)
+
+    Q_l_y_plus_half = X[:-1,1:-1,:]
+    Q_r_y_plus_half = X[1:,1:-1,:]
+    #Q_y_half = f(Q_l_y_plus_half,Q_r_y_plus_half)
+
+    return(Q_l_x_plus_half,Q_r_x_plus_half,Q_l_y_plus_half,Q_r_y_plus_half)
+
+
+######################################################################
+##########################  AUSM scheme  #############################
+######################################################################
+
+
+
+######################################################################
+################  Initialisation and boundaries  #####################
+######################################################################
+
+def initialise(nx,ny,bottom_surfaces):
+    """
+    sets all the interior points at the initial condition given in the project assignment
+    :param nx, ny: (int) size of the augmented grid which is not the number of cells
+    :param bottom_surfaces: (3D array) matrix containing the top and bottom surface vectors
+    :return:(3D array) Q
+    """
+    ########## when changing initial conditions with rho/2 and P/2, does not eveniterate 1 time, the computation of c instatly gives a nan, this could be the source of the error
+
+    Q = np.zeros((ny-1,nx-1,4))  # initialasing Q vector
+    S_mean = (bottom_surfaces[:-1,:,:]+bottom_surfaces[1:,:,:])/2 # computing the interpolation of surface directions at the cells center
+    S_norm = np.linalg.norm(S_mean,axis=2)
+    #  initial set in contravariant velocity
+    Q[:, :, 0] += rhoini
+    Q[:, :, 1] += rhoini*Mini*c(gamma,Tini)#-rhoini*Mini*c(gamma,Tini)*S_mean[:,:,1]/S_norm  # speed vector times xi direction
+    Q[:, :, 2] += 0#rhoini*Mini*c(gamma,Tini)*(S_mean[:,:,0])/S_norm  # speed vector times eta direction
+    Q[:, :, 3] += Pini/(gamma-1) + rhoini*(Mini*c(gamma,Tini))**2/2
+
+    return(Q)
+
+def bc(X,bottom_surfaces):
+    X[:, 0, 0] = rhoini
+    X[:, 0, 1] = rhoini * Mini * c(gamma, Tini)
+    X[:, 0, 2] = 0
+    X[:, 0, 3] = Pini / (gamma - 1) + rhoini * (Mini * c(gamma, Tini)) ** 2 / 2
+
+
+    S_norm = np.linalg.norm(bottom_surfaces, axis=2)
+
+    X[:, -1, :] = X[:, -2, :]  # setting all the hallo cells on the right to the value of the last column of computed cells
+
+    # slip wall condition #
+    # top wall
+    #this approximation is fine as the top wall is flat, but in a second time it could be verified mor rigorously
+    X[-1, 1:-1, 1] = X[-1, 1:-1, 0] * X[-2, 1:-1,1] / X[-2, 1:-1,0]  # slip wall (the boudary condition is actualy computed only over the computational domaine)
+    X[-1, 1:-1, 2] = - X[-1, 1:-1, 0] * X[-2, 1:-1,2] / X[-2, 1:-1,0] # slip wall (the boudary condition is actualy computed only over the computational domaine)
+
+    # bottom wall
+    #the two following conditions com from the lesson. removing them for having u vector paralel to the boundary seems to give slightly better results
+    X[0, 1:-1, 1] = X[0, 1:-1, 0]/(S_norm[1,1:-1]**2)* ( (X[1, 1:-1, 1] / X[1, 1:-1, 0])*(bottom_surfaces[1,1:-1,1]**2-bottom_surfaces[1,1:-1,0]**2) - 2*bottom_surfaces[1,1:-1,1]*bottom_surfaces[1,1:-1,0]*(X[1, 1:-1, 2] / X[1, 1:-1, 0]) )
+    X[0, 1:-1, 2] = X[0, 1:-1, 0] / (S_norm[1, 1:-1] ** 2) * ((X[1, 1:-1, 2] / X[1, 1:-1, 0]) * (bottom_surfaces[1, 1:-1, 0] ** 2 - bottom_surfaces[1, 1:-1, 1] ** 2) - 2 * bottom_surfaces[1, 1:-1,1] * bottom_surfaces[1, 1:-1,0] * (X[1, 1:-1, 1] / X[1, 1:-1, 0]))
+
+    # adiabatic condition # (to have adiabaticity, we need delta T = 0 as stated by fourier's law
+    ############################### if we change the boundary condition for isoenergetic, the result change completly, so that has an impact somewhere
+    # top wall
+    X[-1, :, 3] = r * X[-1, :, 0] / (gamma - 1) * ((gamma - 1) * (X[-2, :, 3] - 1 / 2 * (X[-2, :, 1] ** 2 + X[-2, :, 2] ** 2) / X[-2, :, 0]) / r / X[-2, :, 0]) + 1 / 2 * (X[-1, :, 1] ** 2 + X[-1, :, 2] ** 2) / X[-1, :, 0]
+    # bottom wall
+    X[0, :, 3] = r * X[0, :, 0] / (gamma - 1) * ((gamma - 1) * (X[1, :, 3] - 1 / 2 * (X[1, :, 1] ** 2 + X[1, :, 2] ** 2) / X[1, :, 0]) / r / X[1, :, 0]) + 1 / 2 * (X[0, :, 1] ** 2 + X[0, :, 2] ** 2) / X[0, :, 0]
+
+    # 0 pressure gradient at walls #
+    # bottom wall
+    X[0, -1:1, 3] = (X[1, -1:1, 3] - 0.5 * (X[1, -1:1, 1] ** 2 + X[1, -1:1, 2] ** 2) / X[1, -1:1, 0]) + 0.5 * (
+                X[0, -1:1, 1] ** 2 + X[0, -1:1, 2] ** 2) / X[0, -1:1, 0]
+    # bottom wall
+    X[-1, -1:1, 3] = (X[-2, -1:1, 3] - 0.5 * (X[-2, -1:1, 1] ** 2 + X[-2, -1:1, 2] ** 2) / X[-2, -1:1, 0]) + 0.5 * (
+                X[-1, -1:1, 1] ** 2 + X[-1, -1:1, 2] ** 2) / X[-1, -1:1, 0]
+
+    return(X)
+
+def direction_vectors_i(Sb,Sl):
+    # works with raw Sl and Sb on the augmented grid
+    # interpolation of surface vectors on centers of surfaces along i #
+    ######## seems that the xi vector is a little bit off
+    Sb_mean = (Sb[1:-2,:,:]+Sb[2:-1,:,:])/2
+    Sb_mean = (Sb_mean[:,:-1,:] + Sb_mean[:,1:,:])/2
+    Sb_mean_norm = np.linalg.norm(Sb_mean,axis=2)
+    nx_xi = -Sb_mean[:,:,1]/Sb_mean_norm
+    ny_xi = Sb_mean[:,:,0]/Sb_mean_norm
+
+    Sl_norm = np.linalg.norm(Sl[1:-1,1:-1],axis = 2)
+    nx_eta = Sl[1:-1,1:-1,1]/Sl_norm
+    ny_eta = -Sl[1:-1, 1:-1, 0]/Sl_norm
+    return(nx_xi,ny_xi,nx_eta,ny_eta)
+
+def direction_vectors_j(Sb,Sl):
+    # works with raw Sl and Sb on the augmented grid
+    # interpolation of surface vectors on centers of surfaces along i #
+    ######## seems that the xi vector is a little bit off
+    Sb_norm = np.linalg.norm(Sb[1:-1,1:-1],axis=2)
+    nx_xi = -Sb[1:-1,1:-1,1]/Sb_norm
+    ny_xi = Sb[1:-1,1:-1,0]/Sb_norm
+
+    Sl_mean = (Sl[:,1:-2,:]+Sl[:,2:-1,:])/2
+    Sl_mean = (Sl_mean[:-1,:,:]+Sl_mean[1:,:,:])/2
+    Sl_mean_norm = np.linalg.norm(Sl_mean,axis=2)
+    nx_eta = Sl_mean[:,:,1]/Sl_mean_norm
+    ny_eta = -Sl_mean[:,:,0]/Sl_mean_norm
+    return (nx_xi, ny_xi, nx_eta, ny_eta)
+
+def V_average_i(V):
+    return((V[1:-1,:-1]+V[1:-1,1:])/2)
+
+def V_average_j(V):
+    return ((V[:-1, 1:-1] + V[1:, 1:-1]) / 2)
+
+def M_plus(M):
+    return((np.abs(M)<=1)*(M+1)/4 + (np.abs(M)>1)*(M+np.abs(M))/2)
+
+def M_minus(M):
+    return ((np.abs(M) <= 1) * (-(M - 1)) / 4 + (np.abs(M) > 1) * (M - np.abs(M)) / 2)
+
+def P_plus(P,M):
+    y,x = np.shape(P)
+    res = np.zeros((y,x))
+    for j in range(y):
+        for i in range(x):
+            if np.abs(M[j,i]) <= 1:
+                res[j,i] = P[j,i]/2*(1+M[j,i])
+            else:
+                res[j,i] = P[j,i]/2*(M[j,i]+np.abs(M[j,i]))/M[j,i]
+    return(res)
+
+def P_minus(P,M):
+    y, x = np.shape(P)
+    res = np.zeros((y, x))
+    for j in range(y):
+        for i in range(x):
+            if np.abs(M[j, i]) <= 1:
+                res[j, i] = -P[j, i] / 2 * (1 - M[j, i])
+            else:
+                res[j, i] = P[j, i] / 2 * (M[j, i] - np.abs(M[j, i])) / M[j, i]
+    return (res)
+
+def phi(X):
+    a = c(gamma,extract_T(X))
+    res = np.zeros(np.shape(X))
+    rho = X[:,:,0]
+    rho_u = X [:,:, 1]
+    rho_v = X[:,:,2]
+    ht = extract_ht(X)
+    res[:,:,0] = rho*a
+    res[:,:,1] = rho_u*a
+    res[:,:,2] = rho_v*a
+    res[:,:,3] = rho*ht*a
+    return(res)
+
+def time_step(X,deltat,V,Sb,Sl,plot):
+    # ça part bien, il faut encore reproduire le calcul pour F et croiser les doigts
+    # extrapolate Q on cell edges with MUSCL scheme #
+    Q_l_x_plus_half,Q_r_x_plus_half,Q_l_y_plus_half,Q_r_y_plus_half = MUSCL(X)
+
+    # Use extrapolated Q to compute E and F as given in the Roe scheme #
+    # E_xi
+    # compute Mxi1/2
+    u_l = extract_u(Q_l_x_plus_half)
+    v_l = extract_v(Q_l_x_plus_half)
+    nx_xi, ny_xi, nx_eta, ny_eta = direction_vectors_i(Sb, Sl)
+    u_xi_l = nx_xi*u_l + ny_xi*v_l
+    a = c(gamma,extract_T(Q_l_x_plus_half))
+    M_xi_l_plus = M_plus(u_xi_l/a)
+
+    u_r = extract_u(Q_r_x_plus_half)
+    v_r = extract_v(Q_r_x_plus_half)
+    u_xi_r = nx_xi * u_r + ny_xi * v_r
+    a = c(gamma, extract_T(Q_r_x_plus_half))
+    M_xi_r_minus = M_minus(u_xi_r / a)
+
+    M_xi_half = M_xi_l_plus + M_xi_r_minus # the results look pretty decent
+
+    advection = (np.abs(M_xi_half) >= 0)[:,:,np.newaxis]*phi(Q_l_x_plus_half) + (np.abs(M_xi_half) < 0)[:,:,np.newaxis]*phi(Q_r_x_plus_half)
+
+    # compute the pressure part
+    P_l = extract_P(Q_l_x_plus_half)
+    a = c(gamma, extract_T(Q_l_x_plus_half))
+    P_l_plus = P_plus(P_l,u_xi_l/a)
+    P_r = extract_P(Q_r_x_plus_half)
+    a = c(gamma, extract_T(Q_r_x_plus_half))
+    P_r_minus = P_minus(P_r,u_xi_r / a)
+
+    pressure = np.zeros(np.shape(Q_l_x_plus_half))
+    pressure[:,:,1] = nx_xi*(P_l_plus+P_r_minus)
+    pressure[:,:,2] = ny_xi*(P_l_plus+P_r_minus)
+
+    E_xi = advection+pressure
+
+    # F_eta
+    # compute Meta1/2
+    u_l = extract_u(Q_l_y_plus_half)
+    v_l = extract_v(Q_l_y_plus_half)
+    nx_xi, ny_xi, nx_eta, ny_eta = direction_vectors_j(Sb, Sl)
+    v_eta_l = nx_eta * u_l + ny_eta * v_l
+    a = c(gamma, extract_T(Q_l_y_plus_half))
+    M_eta_l_plus = M_plus(v_eta_l / a)
+
+    u_r = extract_u(Q_r_y_plus_half) # strang as u_l and v_l are not cst but u_r and v_r are
+    v_r = extract_v(Q_r_y_plus_half)
+    v_eta_r = nx_eta * u_r + ny_eta * v_r
+    a = c(gamma, extract_T(Q_r_y_plus_half))
+    M_eta_r_minus = M_minus(v_eta_r / a)
+
+    M_eta_half = M_eta_l_plus + M_eta_r_minus
+
+    advection = (np.abs(M_eta_half) >= 0)[:, :, np.newaxis] * phi(Q_l_y_plus_half) + (np.abs(M_eta_half) < 0)[:, :,np.newaxis] * phi(Q_r_y_plus_half)
+
+    # compute the pressure part
+    P_l = extract_P(Q_l_y_plus_half)
+    a = c(gamma, extract_T(Q_l_y_plus_half))
+    P_l_plus = P_plus(P_l, v_eta_l / a)
+    P_r = extract_P(Q_r_y_plus_half)
+    a = c(gamma, extract_T(Q_r_y_plus_half))
+    P_r_minus = P_minus(P_r, v_eta_r / a)
+
+    pressure = np.zeros(np.shape(Q_l_y_plus_half))
+    pressure[:, :, 1] = nx_eta * (P_l_plus + P_r_minus)
+    pressure[:, :, 2] = ny_eta * (P_l_plus + P_r_minus)
+
+    F_eta = advection + pressure # the flux for u or v is certainly too big to have any convergence
+
+    # computing the step of the iteration with a Roe scheme #
+    i_variation = E_xi[:,1:]*np.linalg.norm(Sl[1:-1,2:-1,:],axis=2)[:,:,np.newaxis] - E_xi[:,:-1]*np.linalg.norm(Sl[1:-1,1:-2,:],axis=2)[:,:,np.newaxis]
+    j_variation = F_eta[1:,:]*np.linalg.norm(Sb[2:-1,1:-1,:],axis=2)[:,:,np.newaxis] - F_eta[:-1,:]*np.linalg.norm(Sb[1:-2,1:-1,:],axis=2)[:,:,np.newaxis]
+    # seems that there is a sign mistake somewher because it shows non physical behaviors if we use the conventional signes and it is not TVD (it is as usual associated with F flux)
+    step = deltat*(i_variation+j_variation)
+
+    # apply the step #
+    X[1:-1, 1:-1, :] = X[1:-1, 1:-1, :] - step/V[1:-1,1:-1,np.newaxis]
+
+    # reset the boundary conditions #
+    X = bc(X, bottom_Surfaces)
+
+    # if required, plot intermediate states #
+    if plot:
+        plt.contourf(x_V, y_V, X[:, :, 0], levels=20, cmap='jet')
+        plt.colorbar()
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title('Density')
+        plt.show()
+
+    return(X)
+
+def solve(nx,ny,V,Sb,Sl):
+    t = 0
+    deltat = 0.00001 # for unstretched grids,0.00001 is fine. for stretched mesh, 0.000001 is fine
+    nb_iter = 0
+    plot = 0
+    Q = initialise(nx,ny,Sb)
+    Q = bc(Q, Sb)
+    Q0 = np.copy(Q)
+    Q = time_step(Q, deltat,V,Sb,Sl,plot)
+    continuity_residual = np.sqrt(np.sum((Q[:,:,0]-Q0[:,:,0])**2))
+    print(continuity_residual)
+    while continuity_residual > 1e-16:  # the right condition is here to automaticaly stop in case of divergence
+        Q0 = np.copy(Q)
+        Q = time_step(Q, deltat,V,Sb,Sl,plot) # diverge for time step >= 0.0001
+        continuity_residual = np.sqrt(np.sum((Q[:, :, 0] - Q0[:, :, 0]) ** 2))
+        print(continuity_residual)
+        nb_iter += 1
+        t+=deltat
+        if nb_iter > 10000:
+            plot = 1
+            nb_iter = 0
+        else:
+            plot = 0
+    print(t)
+    plt.contourf(x_V, y_V, Q[:, :, 0], levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Density')
+    plt.show()
+    plt.contourf(x_V, y_V, (initialisation.gamma - 1) * (Q[:, :, 3] - Q[:, :, 1] ** 2 / Q[:, :, 0] / 2), levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.quiver(x_V, y_V, Q[:, :, 1] / Q[:, :, 0], Q[:, :, 2] / Q[:, :, 0])
+    #plotgrid.gridePlotting('../../../grids','g33x25u_augmented.dat')
+    plt.title('Pressure')
+    plt.show()
+    plt.contourf(x_V, y_V, Q[:, :, 1], levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Density*u')
+    plt.show()
+    plt.contourf(x_V, y_V, Q[:, :, 2], levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Density*v')
+    plt.show()
+    plt.contourf(x_V, y_V, Q[:, :, 3], levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Density*et')
+    plt.show()
+    plt.contourf(x_V, y_V, ((initialisation.gamma - 1) * (Q[:, :, 3] - 1 / 2 * (Q[:, :, 1] ** 2 + Q[:, :, 2] ** 2) / Q[:, :, 0])) / initialisation.r / Q[:, :, 0], levels=20, cmap='jet')
+    plt.colorbar()
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('T')
+    plt.show()
+
+
+if __name__ == '__main__':
+    # reading the grid #
+    nx, ny, x, y = readgrid.readGrid('../../../grids', 'g33x25u_augmented.dat')
+    Volumes, x_V, y_V, bottom_Surfaces, x_Sb, y_Sb, left_Surfaces, x_Sl, y_Sl = cellproperties.cellsCharacteristics('../../../grids', 'g33x25u_augmented.dat')
+    # intitialise the computation parameters #
+    Q = initialise(nx, ny, bottom_Surfaces)
+    Q = bc(Q, bottom_Surfaces)
+    # test of the direction vectors #
+    """nx_xi,ny_xi,nx_eta,ny_eta = direction_vectors_i(bottom_Surfaces,left_Surfaces)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    print(np.mean((nx_xi**2+ny_xi**2))==1) # testing that vectors are of norm 1
+    print(np.mean((nx_eta ** 2 + ny_eta ** 2)) == 1)  # testing that vectors are of norm 1
+    print(np.sum(nx_xi==0)) # = 0 so we can use the matrix R1 of AIAA-2001-2609
+    plt.quiver(x_Sl[1:-1,1:-1], y_Sl[1:-1,1:-1],nx_xi,ny_xi)
+    plt.quiver(x_Sl[1:-1, 1:-1], y_Sl[1:-1, 1:-1], nx_eta, ny_eta)
+    plotgrid.gridePlotting('../../../grids', 'g33x25u_augmented.dat')
+    plt.title('Pressure')
+    plt.show()
+    nx_xi,ny_xi,nx_eta,ny_eta = direction_vectors_j(bottom_Surfaces,left_Surfaces)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    print(np.mean((nx_xi**2+ny_xi**2))==1) # testing that vectors are of norm 1
+    print(np.mean((nx_eta ** 2 + ny_eta ** 2)) == 1)  # testing that vectors are of norm 1
+    print(np.sum(ny_eta == 0)) # = 0 so we can use the matrix R2 of AIAA-2001-2609
+    plt.quiver(x_Sb[1:-1,1:-1], y_Sb[1:-1,1:-1],nx_xi,ny_xi)
+    plt.quiver(x_Sb[1:-1, 1:-1], y_Sb[1:-1, 1:-1], nx_eta, ny_eta)
+    plotgrid.gridePlotting('../../../grids', 'g33x25u_augmented.dat')
+    plt.title('Pressure')
+    plt.show()"""
+    # test of the computation loop #
+    #time_step(Q,0.0001,Volumes,bottom_Surfaces,left_Surfaces,0)
+    solve(nx,ny,Volumes,bottom_Surfaces,left_Surfaces)

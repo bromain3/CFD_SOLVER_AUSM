@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/code/1D/grid_mangment" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/1D/post_processing" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/2D/functions" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/2D/grid_managment" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/2D/post processing" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/2D/solver" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/data/2D/input" isTestSource="false" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

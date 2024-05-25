@@ -1,0 +1,10 @@
+dt = 0.0000001
+MUSCL : eps = 0
+
+initial conditions : 
+    Q[:, :, 0] += rhoini
+    Q[:, :, 1] += rhoini*Mini*c(gamma,Tini)
+    Q[:, :, 2] += 0
+    Q[:, :, 3] += Pini/(gamma-1) + rhoini*(Mini*c(gamma,Tini))**2/2
+
+for the gif : 100 iteration between each image
