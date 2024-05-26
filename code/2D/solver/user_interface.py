@@ -32,6 +32,7 @@ class user_interface(object):
         self.Er = []
         self.T = [0]
         self.tini = time.time()
+        print('Simulation initialized at',time.ctime(self.tini))
         self.dt = dt
 
     def run_computation(self,tol,residuals_printing_interval,saving_interval,save_path,case_name,save_video=False):
@@ -91,7 +92,7 @@ class user_interface(object):
         print('Seconds simulated :', self.T[-1], 'seconds')
         self.converged = True
         self.end_time = time.time()
-        print('End of the simulation in ', self.end_time - self.tini, 'seconds')
+        print('End of the simulation on', self.end_time - self.tini, 'seconds')
 
 
     def residuals_L2(self):
@@ -232,7 +233,7 @@ if __name__ == '__main__':
     path = r'C:\Users\bapti\OneDrive\Documents\python\reprise_code_cfd\grids\2D'
     save_path = r'C:\Users\bapti\OneDrive\Documents\python\reprise_code_cfd\data\2D\output\new_scheme'
     grid_name = 'g65x49u.dat'
-    case_name = 'step_1_AUSM'
+    case_name = 'step_1_AUSM_M_5'
 
     dt = 0.000001
     tol = 1e-16 #3.842363063744487e-05
