@@ -200,8 +200,8 @@ class computational_grid(grid_by_cells):
         self.augmented_grid.Q[rho_v] = 0
         self.augmented_grid.Q[rho_et] = Pini/(gamma-1) + rhoini*(Mini*c(self.augmented_grid.Q,Tini))**2/2
 
-    def initialize_cells_with_save(self,rho,rho_u,rho_v,rho_et):
-        pass
+    def initialize_cells_with_save(self,Q):
+        self.Q = Q
 
     def set_boundary_conditions(self):
 
