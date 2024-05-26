@@ -311,7 +311,7 @@ class computational_grid(grid_by_cells):
         plt.ylabel('y')
         plt.title(r'$\rho e_{t}$')
         plt.show()
-        return('The main grid properties have been succesfully plotted')
+        return('')
 
 
 if __name__=='__main__':
