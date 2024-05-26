@@ -141,6 +141,17 @@ class grid_by_cells(grid_by_nodes):
                 S[y, x] = getattr(self.cells[y][x],surf).vector_representation
         return (S, x_surface, y_surface)
 
+    def get_vect(self,vect):
+        x_surface = np.zeros((self.ny_cells, self.nx_cells))
+        y_surface = np.zeros((self.ny_cells, self.nx_cells))
+        S = np.zeros((self.ny_cells, self.nx_cells, 2))
+        for y in range(self.ny_cells):
+            for x in range(self.nx_cells):
+                x_surface[y, x] = getattr(self.cells[y][x],vect)().initial_node.x
+                y_surface[y, x] = getattr(self.cells[y][x],vect)().initial_node.y
+                S[y, x] = getattr(self.cells[y][x],vect)().vector_representation
+        return (S, x_surface, y_surface)
+
     def plot_direction_vectors(self):
         x_start = []
         y_start = []
@@ -250,7 +261,7 @@ class computational_grid(grid_by_cells):
             self.augmented_grid.cells[-1][x].rho_v = self.augmented_grid.cells[-1][x].rho * self.augmented_grid.cells[-2][x].v()
 
             # bottom wall
-            n_eta = self.augmented_grid.cells[1][x].Stop.get_normalized()
+            n_eta = self.augmented_grid.cells[0][x].Stop.get_normalized()
             self.augmented_grid.cells[0][x].rho_u = self.augmented_grid.cells[0][x].rho * (self.augmented_grid.cells[1][x].u()*(n_eta.y**2-n_eta.x**2)-2*n_eta.x*n_eta.y*self.augmented_grid.cells[1][x].v())
             self.augmented_grid.cells[0][x].rho_v = self.augmented_grid.cells[0][x].rho * (self.augmented_grid.cells[1][x].v() * (n_eta.x ** 2 - n_eta.y ** 2) - 2 * n_eta.x * n_eta.y *self.augmented_grid.cells[1][x].u())
 
