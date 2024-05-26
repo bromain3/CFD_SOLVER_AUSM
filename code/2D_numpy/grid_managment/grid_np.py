@@ -125,17 +125,41 @@ class grid_by_cells(grid_by_nodes):
         return(c)
 
     def get_S_xi(self):
+        # can be optimised by not computing all the array to only extract the leftmost values
         S_xi_beginig_points = (self.nodes[lower_right] + self.nodes[upper_right]) / 2
+        y_ind,x_ind,z_ind = np.shape(S_xi_beginig_points)
+        buff_origin = np.zeros((y_ind,x_ind+1,z_ind))
+        buff_origin[:, 1:, :] = S_xi_beginig_points
+        buff_origin[:, 0, :] =(self.nodes[upper_left]+self.nodes[lower_left])[inlet]/2
+
         r23 = self.nodes[upper_right] - self.nodes[lower_right]  # computing cells' sides lengths
         r23[x],r23[y] = r23[y],- r23[x]
-        res = np.dstack((S_xi_beginig_points,r23))
+        y_ind, x_ind, z_ind = np.shape(r23)
+        buff_len = np.zeros((y_ind,x_ind+1,z_ind))
+        buff_len[:, 1:, :] = r23
+        r41 = self.nodes[upper_left] - self.nodes[lower_left]
+        r41[x],r41[y] = r41[y],- r41[x]
+        buff_len[:, 0, :] = r41[inlet]
+        res = np.dstack((buff_origin,buff_len))
         return(res)
 
     def get_S_eta(self):
-        S_xi_beginig_points = (self.nodes[upper_left] + self.nodes[upper_right]) / 2
+        # can be optimised by not computing all the array to only extract the leftmost values
+        S_eta_beginig_points = (self.nodes[upper_left] + self.nodes[upper_right]) / 2
+        y_ind, x_ind, z_ind = np.shape(S_eta_beginig_points)
+        buff_origin = np.zeros((y_ind + 1, x_ind, z_ind))
+        buff_origin[1:, :, :] = S_eta_beginig_points
+        buff_origin[0, :, :] = (self.nodes[lower_right] + self.nodes[lower_left])[bottom_wall]/2
+
         r34 = self.nodes[upper_left] - self.nodes[upper_right]  # computing cells' sides lengths
         r34[x], r34[y] = r34[y], - r34[x]
-        res = np.dstack((S_xi_beginig_points, r34))
+        y_ind, x_ind, z_ind = np.shape(r34)
+        buff_len = np.zeros((y_ind + 1, x_ind, z_ind))
+        buff_len[1:, :, :] = r34
+        r12 = self.nodes[lower_left] - self.nodes[lower_right] # computing cells' sides lengths
+        r12[x], r12[y] = r12[y], - r12[x]
+        buff_len[0, :, :] = r12[bottom_wall]
+        res = np.dstack((buff_origin, buff_len))
         return (res)
 
     def get_n_xi(self):
@@ -164,7 +188,7 @@ class computational_grid(grid_by_cells):
         grid_by_cells.__init__(self,grid_directory,grid_name)
         if not hasattr(self,'augmented_grid'):
             self.augment_grid()
-        self.augmented_grid.Q = np.zeros((self.augmented_grid.ny_cells,self.augmented_grid.nx_cells,4))
+        self.augmented_grid.Q = np.zeros((self.augmented_grid.ny_cells,self.augmented_grid.nx_cells,4)) # maybe that fixing a dtype could improve performances
         self.intricate_base_to_augmented_grid()
 
     def intricate_base_to_augmented_grid(self):
@@ -200,8 +224,8 @@ class computational_grid(grid_by_cells):
         self.augmented_grid.Q[rho_u][top_wall] = self.augmented_grid.Q[rho][top_wall] * u(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
         self.augmented_grid.Q[rho_v][top_wall] = self.augmented_grid.Q[rho][top_wall] * v(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
             # bottom wall
-        self.augmented_grid.Q[rho_u][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (u(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][y][bottom_wall] ** 2 - self.augmented_grid.n_eta[length][x][bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][bottom_wall] * self.augmented_grid.n_eta[length][y][bottom_wall] * v(self.augmented_grid.Q)[just_after_bottom_wall])
-        self.augmented_grid.Q[rho_v][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (v(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][x][bottom_wall] ** 2 - self.augmented_grid.n_eta[length][y][bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][bottom_wall] * self.augmented_grid.n_eta[length][y][bottom_wall] * u(self.augmented_grid.Q)[just_after_bottom_wall])
+        self.augmented_grid.Q[rho_u][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (u(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][y][just_after_bottom_wall] ** 2 - self.augmented_grid.n_eta[length][x][just_after_bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][just_after_bottom_wall] * self.augmented_grid.n_eta[length][y][just_after_bottom_wall] * v(self.augmented_grid.Q)[just_after_bottom_wall])
+        self.augmented_grid.Q[rho_v][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (v(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][x][just_after_bottom_wall] ** 2 - self.augmented_grid.n_eta[length][y][just_after_bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][just_after_bottom_wall] * self.augmented_grid.n_eta[length][y][just_after_bottom_wall] * u(self.augmented_grid.Q)[just_after_bottom_wall])
 
         # adiabatic condition #
             # top wall
@@ -279,7 +303,8 @@ def ht(Q):
     return (et(Q) + P(Q) / Q[rho])
 
 def T(Q):
-    return max((((gam(Q) - 1) * (Q[rho_et] - 1 / 2 * (Q[rho_u] ** 2) / Q[rho])) / r / Q[rho]),100) # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
+    # lower bound on temperature (100K in the other codes) is removed
+    return (((gam(Q) - 1) * (Q[rho_et] - 1 / 2 * (Q[rho_u] ** 2) / Q[rho])) / r / Q[rho]) # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
 
 def M(Q):
     return np.sqrt(u(Q) ** 2 + v(Q) ** 2) / c(Q)

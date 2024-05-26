@@ -46,7 +46,7 @@ if __name__ == '__main__':
     ## S_xi comparison ##
     #####################
     S_xi, x_S_xi, y_S_xi = g.get_surfaces('Sright')
-    S_xi_np = g_np.S_xi
+    S_xi_np = g_np.S_xi[:,1:]
     print('The maximum difference between x componnent of cells S_xi_right is:', find_equality(S_xi[x], S_xi_np[length][x]))
     print('The maximum difference between y componnent of cells S_xi_right is:', find_equality(S_xi[y], S_xi_np[length][y]))
     print('The maximum difference between x componnent of cells S_xi_right origin is:',find_equality(x_S_xi, S_xi_np[origin][x]))
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     ## S_eta comparison ##
     ######################
     S_eta, x_S_eta, y_S_eta = g.get_surfaces('Stop')
-    S_eta_np = g_np.S_eta
+    S_eta_np = g_np.S_eta[1:,:]
     print('The maximum difference between x componnent of cells S_eta_right is:',find_equality(S_eta[x], S_eta_np[length][x]))
     print('The maximum difference between y componnent of cells S_eta_right is:',find_equality(S_eta[y], S_eta_np[length][y]))
     print('The maximum difference between x componnent of cells S_eta_right origin is:',find_equality(x_S_eta, S_eta_np[origin][x]))
@@ -66,13 +66,13 @@ if __name__ == '__main__':
     ## n_xi/n_eta comparison ##
     ###########################
     n_xi, x_n_xi, y_n_xi = g.get_vect('n_xi_plus_half')
-    n_xi_np = g_np.n_xi
+    n_xi_np = g_np.n_xi[:,1:]
     print('The maximum difference between x componnent of cells n_xi_right is:',find_equality(n_xi[x], n_xi_np[length][x]))
     print('The maximum difference between y componnent of cells n_xi_right is:',find_equality(n_xi[y], n_xi_np[length][y]))
     print('The maximum difference between x componnent of cells n_xi_right origin is:',find_equality(x_n_xi, n_xi_np[origin][x]))
     print('The maximum difference between y componnent of cells n_xi_right origin is:',find_equality(y_n_xi, n_xi_np[origin][y]))
     n_eta, x_n_eta, y_n_eta = g.get_vect('n_eta_plus_half')
-    n_eta_np = g_np.n_eta
+    n_eta_np = g_np.n_eta[1:,:]
     print('The maximum difference between x componnent of cells n_eta_top is:',find_equality(n_eta[x], n_eta_np[length][x]))
     print('The maximum difference between y componnent of cells n_eta_top is:',find_equality(n_eta[y], n_eta_np[length][y]))
     print('The maximum difference between x componnent of cells n_eta_top origin is:',find_equality(x_n_eta, n_eta_np[origin][x]))
