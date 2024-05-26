@@ -315,7 +315,7 @@ class computational_grid(grid_by_cells):
 
 
 if __name__=='__main__':
-    g = grid_by_cells(r'C:\Users\bapti\OneDrive\Documents\python\reprise_code_cfd\grids', 'g33x25u.dat')
+    g = grid_by_cells(r'C:\Users\bapti\OneDrive\Documents\python\reprise_code_cfd\grids\2D', 'g33x25u.dat')
     aug_g = g.augment_grid()
     aug_g.plot_grid(color='k')
     g.plot_grid()
