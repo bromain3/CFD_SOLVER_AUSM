@@ -211,7 +211,7 @@ class computational_cell(cell):
         :param Q: array of state vectors (3D-array)
         :return: array containing the value of T (2D-array)
         """
-        return max((((self.gam() - 1) * (self.rho_et - 1 / 2 * (self.rho_u ** 2) / self.rho)) / r / self.rho),100) # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
+        return max((((self.gam() - 1) / r * (self.rho_et - 1 / 2 * (self.rho_u ** 2 + self.rho_v ** 2) / self.rho)) / self.rho),100) # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
 
     def M(self):
         return np.sqrt(self.u() ** 2 + self.v() ** 2) / self.c()

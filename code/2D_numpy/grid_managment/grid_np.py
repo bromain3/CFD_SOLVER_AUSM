@@ -189,19 +189,24 @@ class computational_grid(grid_by_cells):
         if not hasattr(self,'augmented_grid'):
             self.augment_grid()
         self.augmented_grid.Q = np.zeros((self.augmented_grid.ny_cells,self.augmented_grid.nx_cells,4)) # maybe that fixing a dtype could improve performances
+        #!!! it seems that there is a slight problem in grid intrication when loading an existing state file
         self.intricate_base_to_augmented_grid()
+        self.Mini = Mini
+        self.Pini = Pini
+        self.rhoini = rhoini
+        self.Tini = Tini
 
     def intricate_base_to_augmented_grid(self):
         self.Q = self.augmented_grid.Q[interior]
 
     def initialize_cells(self):
-        self.augmented_grid.Q[rho] = rhoini
-        self.augmented_grid.Q[rho_u] = rhoini*Mini*c(self.augmented_grid.Q,Tini)
+        self.augmented_grid.Q[rho] = self.rhoini
+        self.augmented_grid.Q[rho_u] = self.rhoini*self.Mini*c(self.augmented_grid.Q,self.Tini)
         self.augmented_grid.Q[rho_v] = 0
-        self.augmented_grid.Q[rho_et] = Pini/(gamma-1) + rhoini*(Mini*c(self.augmented_grid.Q,Tini))**2/2
-
+        self.augmented_grid.Q[rho_et] = self.Pini/(gam(self.augmented_grid.Q)-1) + self.rhoini*(self.Mini*c(self.augmented_grid.Q,self.Tini))**2/2
+    
     def initialize_cells_with_save(self,Q):
-        self.Q = Q
+        self.augmented_grid.Q[interior] = Q.copy()
 
     def set_boundary_conditions(self):
 
@@ -210,20 +215,22 @@ class computational_grid(grid_by_cells):
         # the following can be written in less lines by appying the same function to the variables top_wall and bottom_wall. it will also make the code more consistant
 
         # set inlet conditions
-        self.augmented_grid.Q[rho][inlet] = rhoini
-        self.augmented_grid.Q[rho_u][inlet] = rhoini*Mini*c(self.augmented_grid.Q,Tini) # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
+        self.augmented_grid.Q[rho][inlet] = self.rhoini
+        self.augmented_grid.Q[rho_u][inlet] = self.rhoini*self.Mini*c(self.augmented_grid.Q,self.Tini) # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
         self.augmented_grid.Q[rho_v][inlet] = 0
-        self.augmented_grid.Q[rho_et][inlet] = Pini/(gamma-1) + rhoini*(Mini*c(self.augmented_grid.Q,Tini))**2/2
+        self.augmented_grid.Q[rho_et][inlet] = Pini/(gam(self.augmented_grid.Q)-1) + self.rhoini*(self.Mini*c(self.augmented_grid.Q,self.Tini))**2/2
 
         # setting all the hallo cells on the right to the value of the last column of computed cells
         self.augmented_grid.Q[outlet] = self.augmented_grid.Q[just_before_outlet] # to improve performance, we only have to make the -1 and -2 column point on the same memory adresse once in the init and we don't have to compute it every iteration
 
         # slip wall condition #
             # top wall
-            # this approximation is fine as the top wall is flat, but in a second time it could be verified more rigorously
-        self.augmented_grid.Q[rho_u][top_wall] = self.augmented_grid.Q[rho][top_wall] * u(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
-        self.augmented_grid.Q[rho_v][top_wall] = self.augmented_grid.Q[rho][top_wall] * v(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
-            # bottom wall
+        #self.augmented_grid.Q[rho_u][top_wall] = self.augmented_grid.Q[rho][top_wall] * u(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
+        #self.augmented_grid.Q[rho_v][top_wall] = self.augmented_grid.Q[rho][top_wall] * v(self.augmented_grid.Q)[just_before_top_wall]  # can be optimised by giving only the x = 0 column of Q to the c function and not computing the whole array of c and thene taking what we want
+        self.augmented_grid.Q[rho_u][top_wall] = self.augmented_grid.Q[rho][top_wall] * (u(self.augmented_grid.Q)[just_before_top_wall] * (self.augmented_grid.n_eta[length][y][just_before_top_wall] ** 2 -self.augmented_grid.n_eta[length][x][just_before_top_wall] ** 2) - 2 *self.augmented_grid.n_eta[length][x][just_before_top_wall] * self.augmented_grid.n_eta[length][y][just_before_top_wall] * v(self.augmented_grid.Q)[just_before_top_wall])
+        self.augmented_grid.Q[rho_v][top_wall] = self.augmented_grid.Q[rho][top_wall] * (v(self.augmented_grid.Q)[just_before_top_wall] * (self.augmented_grid.n_eta[length][x][just_before_top_wall] ** 2 -self.augmented_grid.n_eta[length][y][just_before_top_wall] ** 2) - 2 *self.augmented_grid.n_eta[length][x][just_before_top_wall] * self.augmented_grid.n_eta[length][y][just_before_top_wall] * u(self.augmented_grid.Q)[just_before_top_wall])
+
+        # bottom wall
         self.augmented_grid.Q[rho_u][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (u(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][y][just_after_bottom_wall] ** 2 - self.augmented_grid.n_eta[length][x][just_after_bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][just_after_bottom_wall] * self.augmented_grid.n_eta[length][y][just_after_bottom_wall] * v(self.augmented_grid.Q)[just_after_bottom_wall])
         self.augmented_grid.Q[rho_v][bottom_wall] = self.augmented_grid.Q[rho][bottom_wall] * (v(self.augmented_grid.Q)[just_after_bottom_wall] * (self.augmented_grid.n_eta[length][x][just_after_bottom_wall] ** 2 - self.augmented_grid.n_eta[length][y][just_after_bottom_wall] ** 2) - 2 * self.augmented_grid.n_eta[length][x][just_after_bottom_wall] * self.augmented_grid.n_eta[length][y][just_after_bottom_wall] * u(self.augmented_grid.Q)[just_after_bottom_wall])
 
@@ -304,7 +311,7 @@ def ht(Q):
 
 def T(Q):
     # lower bound on temperature (100K in the other codes) is removed
-    return (((gam(Q) - 1) * (Q[rho_et] - 1 / 2 * (Q[rho_u] ** 2) / Q[rho])) / r / Q[rho]) # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
+    return ((gam(Q) - 1)/r * ((Q[rho_et] - 1 / 2 * (Q[rho_u] ** 2 + Q[rho_v] ** 2) / Q[rho])/Q[rho]))  # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
 
 def M(Q):
     return np.sqrt(u(Q) ** 2 + v(Q) ** 2) / c(Q)
@@ -327,3 +334,4 @@ if __name__ == '__main__':
     g.initialize_cells()
     g.set_boundary_conditions()
     print(g)
+    print(g.augmented_grid.V)
