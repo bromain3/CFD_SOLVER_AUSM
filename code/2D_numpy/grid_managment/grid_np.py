@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r'..\..\data\2D\input')
+sys.path.append(r'..\..\..\data\2D\input')
 sys.path.append(r'..\code_readability_functions')
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,23 +8,30 @@ from slices import *
 from initial_conditions import *
 from air import *
 
-# !!! can be optimised by having nodes as a state var instead of x and y so that we do not have to recompute the dstack everytime
+# !!! can be optimised by having nodes as an instance var instead of x and y so that we do not have to recompute the dstack everytime
 
 colorScheme = 'jet'
 levels = 50
 
 class grid_by_nodes(object):
     def __init__(self,grid_directory, grid_name):
+        """
+        Initialisation function of the grid_by_node class
+        :param grid_directory (str): Directory in which is stored the grid file
+        :param grid_name (str): Name of the grid file
+        :return None
+        """
         self.grid_directory = grid_directory
         self.grid_name = grid_name
         self.nx,self.ny,self.x,self.y = self.read_grid(grid_directory, grid_name)
 
     def read_grid(self,grid_directory, grid_name):
         """
-        read grid file to have the position of the nodes and grid size
-        :param file: path to the grid file (str)
-        :return: nx,ny : number of points in the file (int)
-                 x,y : coordinates of the points as it would be done by the meshgrid function (np.ndarray 2d)
+        Read grid file to have the position of the nodes and grid size
+        :param grid_directory (str): Directory in which is stored the grid file
+        :param grid_name (str): Name of the grid file
+        :return: nx,ny (int): Number of points in the file
+                 x,y (np.ndarray 2d): Coordinates of the points as it would be done by the meshgrid function
         """
 
         # open file and read line by line to assign to array
@@ -43,9 +50,8 @@ class grid_by_nodes(object):
 
     def augment_grid(self):
         """
-        augment a given grid with hallo cells
-        :param file: path to the grid file (str)
-        :return: augmented grid file
+        Augment a given grid with hallo cells
+        :return: augmented grid (grid_np.grid_by_cells)
         """
 
         # new grid definition #
@@ -77,8 +83,8 @@ class grid_by_nodes(object):
 
     def plot_grid(self,color='red'):
         """
-        function to plot the grid and the x,y,eta,xi axis. It actually does not show the grid, and it is necessary to call plt.plot() afterwards
-        :param file: path to the grid file (str)
+        Function to plot the grid and the x,y,eta and xi axis. It actually does not show the grid, and it is necessary to call plt.plot() afterwards
+        :param color (str): Optional, color of the plotted grid
         :return: None
         """
         # mesh ploting
@@ -98,8 +104,14 @@ class grid_by_nodes(object):
 
 
 class grid_by_cells(grid_by_nodes):
-    #!!! can be optimised by having nodes as a state var instead of x and y so that we do not have to recompute the dstack everytime
+    #!!! can be optimised by having nodes as an instance var instead of x and y so that we do not have to recompute the dstack everytime
     def __init__(self,grid_directory, grid_name):
+        """
+        Initialisation function of the grid_by_node class
+        :param grid_directory (str): Directory in which is stored the grid file
+        :param grid_name (str): Name of the grid file
+        :return None
+        """
         grid_by_nodes.__init__(self,grid_directory, grid_name)
         self.nx_cells = self.nx - 1
         self.ny_cells = self.ny - 1
@@ -113,6 +125,10 @@ class grid_by_cells(grid_by_nodes):
         del self.nodes # not usefull anymore
 
     def get_volumes(self):
+        """
+        Computes the array of cells volume
+        :return: Array of cells Volume (np.array 2D)
+        """
         r13 = self.nodes[upper_right] - self.nodes[lower_left]
         r24 = self.nodes[upper_left] - self.nodes[lower_right]
         matrix = np.stack((r13,r24),axis=3)
@@ -120,11 +136,19 @@ class grid_by_cells(grid_by_nodes):
         return(res)
 
     def get_centroids(self):
+        """
+        Computes the array of cells centroids
+        :return: Array of cells centroids (np.array 2D)
+        """
         # the following computation is an approximation
         c = (self.nodes[upper_right] + self.nodes[lower_left] + self.nodes[upper_left] + self.nodes[lower_right]) / 4
         return(c)
 
     def get_S_xi(self):
+        """
+        Computes the array of cells surfaces vector for surfaces perpendicular to the xi axis
+        :return: Array of cells surfaces vector for surfaces perpendicular to the xi axis (np.array 3D)
+        """
         # can be optimised by not computing all the array to only extract the leftmost values
         S_xi_beginig_points = (self.nodes[lower_right] + self.nodes[upper_right]) / 2
         y_ind,x_ind,z_ind = np.shape(S_xi_beginig_points)
@@ -144,6 +168,10 @@ class grid_by_cells(grid_by_nodes):
         return(res)
 
     def get_S_eta(self):
+        """
+        Computes the array of cells surfaces vector for surfaces perpendicular to the eta axis
+        :return: Array of cells surfaces vector for surfaces perpendicular to the eta axis (np.array 3D)
+        """
         # can be optimised by not computing all the array to only extract the leftmost values
         S_eta_beginig_points = (self.nodes[upper_left] + self.nodes[upper_right]) / 2
         y_ind, x_ind, z_ind = np.shape(S_eta_beginig_points)
@@ -163,28 +191,50 @@ class grid_by_cells(grid_by_nodes):
         return (res)
 
     def get_n_xi(self):
+        """
+        Computes the array of cells surfaces unit vectors for surfaces perpendicular to the xi axis
+        :return: Array of cells surfaces unit vectors for surfaces perpendicular to the xi axis (np.array 3D)
+        """
         res = np.zeros(np.shape(self.S_xi))
         res[origin] = self.S_xi[origin]
         res[length] = self.S_xi[length] / np.linalg.norm(self.S_xi[length],axis=2)[:,:,np.newaxis]
         return(res)
 
     def get_n_eta(self):
+        """
+        Computes the array of cells surfaces unit vectors for surfaces perpendicular to the eta axis
+        :return: Array of cells surfaces unit vectors for surfaces perpendicular to the eta axis (np.array 3D)
+        """
         res = np.zeros(np.shape(self.S_eta))
         res[origin] = self.S_eta[origin]
         res[length] = self.S_eta[length] / np.linalg.norm(self.S_eta[length],axis=2)[:,:,np.newaxis]
         return(res)
 
     def plot_surface_vectors(self):
+        """
+        Makes a quiver plot of the surfaces vectors. It actually does not show the grid, and it is necessary to call plt.plot() afterwards
+        :return: None
+        """
         plt.quiver(self.S_xi[origin][x], self.S_xi[origin][y], self.S_xi[length][x], self.S_xi[length][y], scale=5, headwidth=2, headlength=5)
         plt.quiver(self.S_eta[origin][x], self.S_eta[origin][y], self.S_eta[length][x], self.S_eta[length][y], scale=5,headwidth=2, headlength=5)
 
     def plot_direction_vectors(self):
+        """
+        Makes a quiver plot of the unit vectors. It actually does not show the grid, and it is necessary to call plt.plot() afterwards
+        :return: None
+        """
         plt.quiver(self.n_xi[origin][x], self.n_xi[origin][y], self.n_xi[length][x], self.n_xi[length][y], scale=50,headwidth=2, headlength=5)
         plt.quiver(self.n_eta[origin][x], self.n_eta[origin][y], self.n_eta[length][x], self.n_eta[length][y], scale=50,headwidth=2, headlength=5)
 
 
 class computational_grid(grid_by_cells):
     def __init__(self,grid_directory,grid_name):
+        """
+        Initialisation function of the grid_by_node class
+        :param grid_directory (str): Directory in which is stored the grid file
+        :param grid_name (str): Name of the grid file
+        :return None
+        """
         grid_by_cells.__init__(self,grid_directory,grid_name)
         if not hasattr(self,'augmented_grid'):
             self.augment_grid()
@@ -197,18 +247,35 @@ class computational_grid(grid_by_cells):
         self.Tini = Tini
 
     def intricate_base_to_augmented_grid(self):
+        """
+        Make the Q vector of the augmented grid and the one of the base grid point on the same memory adresses
+        :return: None
+        """
         self.Q = self.augmented_grid.Q[interior]
 
     def initialize_cells(self):
+        """
+        Initilaize the cells with constant values
+        :return: None
+        """
         self.augmented_grid.Q[rho] = self.rhoini
         self.augmented_grid.Q[rho_u] = self.rhoini*self.Mini*c(self.augmented_grid.Q,self.Tini)
         self.augmented_grid.Q[rho_v] = 0
         self.augmented_grid.Q[rho_et] = self.Pini/(gam(self.augmented_grid.Q)-1) + self.rhoini*(self.Mini*c(self.augmented_grid.Q,self.Tini))**2/2
     
     def initialize_cells_with_save(self,Q):
+        """
+        Initialize The cells with an array of state vectors
+        :param Q (np.array 3D): Array of state vectors used for initialization
+        :return: None
+        """
         self.augmented_grid.Q[interior] = Q.copy()
 
     def set_boundary_conditions(self):
+        """
+        Set boundary conditions (aka the value of shadow cells)
+        :return: None
+        """
 
         # we have to define gamma = gam(Q) if we want to implement non constant gamma
         # we can also assign V_2 = (self.Q[rho_u][top_wall] ** 2 + self.Q[rho_v][top_wall] ** 2) and this kind of variables for the sake of readability (be be carfull of not computing to much useless cells
@@ -251,6 +318,10 @@ class computational_grid(grid_by_cells):
                                          X[-1, -1:1, 1] ** 2 + X[-1, -1:1, 2] ** 2) / X[-1, -1:1, 0]"""
 
     def __str__(self):
+        """
+        Overload of the str function
+        :return: None
+        """
         x_centroid, y_centroid = self.centroids[x],self.centroids[y]
         r = self.Q[rho]
         vel_u = u(self.Q)
@@ -287,36 +358,87 @@ class computational_grid(grid_by_cells):
 ######################################################################
 
 def gam(Q):
+    """
+    Returns the value of Cp/Cv
+    :param Q: array of state vectors (3D-array)
+    :return: gamma (float or 2D-array)
+    """
     return(gamma)
 
 def c(Q, Temp='not_given'):
+    """
+    Returns the value of speed of sound
+    :param Q: array of state vectors (3D-array)
+    :param Temp: Optional (float), If we want to use a given temperature to compute c (it is used for initialisation only)
+    :return: speed of sound (float or 2D-array)
+    """
     if Temp == 'not_given':
         Temp = T(Q)
     return (np.sqrt(gam(Q) * r * Temp))
 
 def u(Q):
+    """
+    Extract the value of u form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of u (2D-array)
+    """
     return (Q[rho_u] / Q[rho])
 
 def v(Q):
+    """
+    Extract the value of v form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of v (2D-array)
+    """
     return (Q[rho_v] / Q[rho])
 
 def et(Q):
+    """
+    Extract the value of et form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of et (2D-array)
+    """
     return (Q[rho_et] / Q[rho])
 
 def P(Q):
+    """
+    Extract the value of P form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of P (2D-array)
+    """
     return ((gam(Q) - 1) * Q[rho] * (et(Q) - 0.5 * (u(Q) ** 2 + v(Q) ** 2)))
 
 def ht(Q):
+    """
+    Extract the value of ht form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of ht (2D-array)
+    """
     return (et(Q) + P(Q) / Q[rho])
 
 def T(Q):
+    """
+    Extract the value of T form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of T (2D-array)
+    """
     # lower bound on temperature (100K in the other codes) is removed
     return ((gam(Q) - 1)/r * ((Q[rho_et] - 1 / 2 * (Q[rho_u] ** 2 + Q[rho_v] ** 2) / Q[rho])/Q[rho]))  # by taking T values no smaller than 100K, We avoid too large values of M (because small c), so it helps convergence a lot. In a second time, we could use this formula for transiant, and after enough step, go back to the normal formula
 
 def M(Q):
+    """
+    Extract the value of M form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of M (2D-array)
+    """
     return np.sqrt(u(Q) ** 2 + v(Q) ** 2) / c(Q)
 
 def P0(Q):
+    """
+    Extract the value of P0 form Q
+    :param Q: array of state vectors (3D-array)
+    :return: array containing the value of P0 (2D-array)
+    """
     return (P(Q) * (1 + (gam(Q) - 1) / 2 * M(Q) ** 2) ** (gam(Q) / (gam(Q) - 1)))
 
 

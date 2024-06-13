@@ -12,6 +12,7 @@
       <sourceFolder url="file://$MODULE_DIR$/code/2D_numpy/code_readability_functions" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/code/2D_numpy/grid_managment" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/code/2D_numpy/solver" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/code/2D_numpy/user_interface" isTestSource="false" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
